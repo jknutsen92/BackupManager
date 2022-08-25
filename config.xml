@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<Config>
+    <BackupRootDirectory>E:\windows\</BackupRootDirectory>
+    <TargetDirectories>
+        <TargetDirectory>C:\Users\jknut\Desktop\Notes\</TargetDirectory>
+    </TargetDirectories>
+    <Logging>
+        <MaxLogFiles>10</MaxLogFiles>
+        <Directory>.\logs\</Directory>
+    </Logging>
+    <Test>
+        <BackupRootDirectory>.\backups\</BackupRootDirectory>
+        <TargetDirectories>
+            <TargetDirectory>.\main\</TargetDirectory>
+            <TargetDirectory>.\secondary\</TargetDirectory>
+        </TargetDirectories>
+    </Test>
+</Config>
