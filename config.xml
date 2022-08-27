@@ -8,6 +8,9 @@
         <MaxLogFiles>10</MaxLogFiles>
         <Directory>.\logs\</Directory>
     </Logging>
+    <FileRetention>
+        <DeleteBackupAfterTargetDeleted unit="Days">90</DeleteBackupAfterTargetDeleted>
+    </FileRetention>
     <Test>
         <BackupRootDirectory>.\backups\</BackupRootDirectory>
         <TargetDirectories>
