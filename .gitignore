@@ -2,3 +2,5 @@
 backups/
 main/
 secondary/
+*.txt
+*.log

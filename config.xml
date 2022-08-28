@@ -5,6 +5,7 @@
         <TargetDirectory>C:\Users\jknut\Desktop\Notes\</TargetDirectory>
     </TargetDirectories>
     <Logging>
+        <Level>INFO</Level>
         <MaxLogFiles>10</MaxLogFiles>
         <Directory>.\logs\</Directory>
     </Logging>
