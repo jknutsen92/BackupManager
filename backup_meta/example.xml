@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Meta BackupName="BackupName">
+    <DeletedItems>
+        <DeletedItem TimeDeleted="DateTime">Path</DeletedItem>
+    </DeletedItems>
+</Meta>

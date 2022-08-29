@@ -19,8 +19,7 @@
     Date:   August 25, 2022    
 #>
 
-#TODO: Address removing .sentinel file when the target file is found again in the source
-#TODO: Cleanup excessive nesting in logic
+#TODO: Replace sentinel files with an XML file for each backup directory that lists the deleted files
 
 Param(
     [Parameter(  
@@ -33,6 +32,10 @@ Param(
     )]
     [switch]$LogToFile
 )
+
+Import-Module ".\Update-BackupFiles.ps1"
+Import-Module ".\Sync-DeletedDirectory.ps1"
+
 # Constants
 $SENTINEL_FILE =  ".sentinel"
 
@@ -85,85 +88,24 @@ $timer = [Diagnostics.Stopwatch]::StartNew()
 $backupCount = 0
 foreach ($target in $targetDirectories) {
     Write-Log -Level DEBUG "Accessing target directory $target"
-    $targetRegex = Select-String -Pattern ".+\\([^\\]+)\\?$" -InputObject $target
-    $targetName = $targetRegex.Matches.Groups[1].Value
-    $targetBackup = "$backupRootDirectory\$targetName"
-    $targetBackupExists = Test-Path -Path $targetBackup
+    $targetName = (Select-String -Pattern ".+\\([^\\]+)\\?$" -InputObject $target).Matches.Groups[1].Value
+    $backup = "$backupRootDirectory\$targetName"
+    $backupExists = Test-Path -Path $backup
 
-    if (-not (Test-Path -Path $target) -and (-not $targetBackupExists)) {
+    if (-not (Test-Path -Path $target) -and (-not $backupExists)) {
         Write-Log -Level ERROR "$target does not exist and there is no corresponding backup"
-        continue
     }
-
-    if (-not $targetBackupExists) {
+    elseif (-not $backupExists) {
         Write-Log -Level DEBUG "$targetName does not exist in backup directory."
-        Copy-Item -Path $target -Destination $targetBackup -Recurse
-        Write-Log -Level INFO "Copied $target to $targetBackup"
-        continue
+        Copy-Item -Path $target -Destination $backup -Recurse
+        Write-Log -Level INFO "Copied $target to $backup"
     }
-
-    $targetDir = Get-ChildItem $target -Recurse -Exclude "*$SENTINEL_FILE" -ErrorAction Ignore
-    if ($null -ne $targetDir) {
+    elseif ($null -ne (Get-ChildItem $target -Recurse -Exclude "*$SENTINEL_FILE" -ErrorAction Ignore)) {
         $backupCount++
-        $filesExistDiff = Compare-Object `
-            -ReferenceObject (Get-ChildItem $targetBackup -Recurse -Exclude "*$SENTINEL_FILE") `
-            -DifferenceObject $targetDir -Property Name
-
-        foreach ($diff in $filesExistDiff) {
-            if ($diff.SideIndicator -eq "<=") {
-                # Delete files from backup that were deleted in target
-                #TODO: Add a sentinel file and only delete after the delete period, and issue a warning
-                $destPath = (Get-ChildItem $targetBackup -Filter $diff.Name -Recurse).FullName
-                Remove-Item -Path $destPath
-                Write-Log -Level DEBUG "Deleted file in backup $destPath that was deleted in the target"
-            }
-            elseif ($diff.SideIndicator -eq "=>") {
-                # Copy files that were added in target
-                $srcPath =  (Get-ChildItem $target -Filter $diff.Name -Recurse).FullName
-                $srcRelativePath = (Select-String -Pattern "$targetName\\(.+)$" -InputObject $srcPath).Matches.Groups[1].Value
-                $destPath = "$targetBackup\$srcRelativePath"
-                Copy-Item -Path $srcPath -Destination $destPath
-                Write-Log -Level DEBUG "Copied new file in target $srcPath to backup at $destPath"
-            }
-        }
-        # Copy files to backup that have been updated since previous backup
-        $srcFiles = Get-ChildItem $target -Recurse
-        foreach ($srcFile in $srcFiles) {
-            $srcPath = $srcFile.FullName
-            $srcRelativePath = (Select-String -Pattern "$targetName\\(.+)$" -InputObject $srcPath).Matches.Groups[1].Value
-            $destPath = "$targetBackup\$srcRelativePath"
-            $targetMT = (Get-Item -Path $srcPath).LastWriteTime
-            $backupMT = (Get-Item -Path $destPath).LastWriteTime
-            if ($targetMT -gt $backupMT) {
-                Write-Log -Level DEBUG "Copying file $srcPath modified at $targetMT to $destPath, previously copied at $backupMT"
-                Copy-Item -Path $srcPath -Destination $destPath
-            }
-        }
+        Update-BackupFiles $target $targetName $backup $SENTINEL_FILE
     }
     else {
-        $units = $config.Config.FileRetention.DeleteBackupAfterTargetDeleted.unit
-        $value = $config.Config.FileRetention.DeleteBackupAfterTargetDeleted."#text"
-
-        if (Test-Path -Path "$targetBackup\$SENTINEL_FILE") {
-            $sentienlMT = (Get-Item -Path "$targetBackup\$SENTINEL_FILE").LastWriteTime
-            switch ($units) {
-                "Days" { $deletePeriod = New-TimeSpan -Days $value }
-            }
-            $now = Get-Date
-            $deleteTime = $sentienlMT + $deletePeriod
-            if ($now -ge $deleteTime) {
-                Remove-Item -Path $targetBackup -Recurse
-                Write-Log -Level INFO "Deleted backup $target after staling for $value $units"
-            }
-            else {
-                Write-Log -Level WARNING "$targetBackup will be deleted on $deleteTime"
-            }
-        }
-        else {
-            Write-Log -Level INFO "Target directory $target was emptied or deleted"
-            New-Item -Path "$targetBackup\$SENTINEL_FILE" -ItemType File
-            Write-Log -Level WARNING "$targetBackup will be deleted from backup after $value $units"
-        }
+        Sync-DeletedDirectory $target $backup $config $SENTINEL_FILE
     }
 }
 $timer.Stop()

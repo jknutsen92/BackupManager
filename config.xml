@@ -2,10 +2,10 @@
 <Config>
     <BackupRootDirectory>E:\windows\</BackupRootDirectory>
     <TargetDirectories>
-        <TargetDirectory>C:\Users\jknut\Desktop\Notes\</TargetDirectory>
+        <Notes>C:\Users\jknut\Desktop\Notes\</Notes>
     </TargetDirectories>
     <Logging>
-        <Level>INFO</Level>
+        <Level>DEBUG</Level>
         <MaxLogFiles>10</MaxLogFiles>
         <Directory>.\logs\</Directory>
     </Logging>
@@ -15,8 +15,8 @@
     <Test>
         <BackupRootDirectory>.\backups\</BackupRootDirectory>
         <TargetDirectories>
-            <TargetDirectory>.\main\</TargetDirectory>
-            <TargetDirectory>.\secondary\</TargetDirectory>
+            <Main>.\main\</Main>
+            <Secondary>.\secondary\</Secondary>
         </TargetDirectories>
     </Test>
 </Config>
