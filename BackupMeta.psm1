@@ -84,3 +84,8 @@ function Remove-DeletedItemFromMeta($Meta, $Path) {
         Wait-Logging
     }
 }
+
+function Get-DeletedItemsFromMeta($Meta) {
+    [xml]$xml = Get-Content -Path $Meta -ErrorAction Stop
+    return $xml.Meta.DeletedItems.DeletedItem."#text"
+}

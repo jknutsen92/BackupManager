@@ -1,4 +1,4 @@
-function Sync-DeletedDirectory($TargetDirectory, $BackupDirectory, $Config, $SENTINEL_FILE) {
+function Sync-DeletedDirectory($TargetDirectory, $BackupDirectory, $Config, $Meta) {
     $units = $Config.Config.FileRetention.DeleteBackupAfterTargetDeleted.unit
     $value = $Config.Config.FileRetention.DeleteBackupAfterTargetDeleted."#text"
 

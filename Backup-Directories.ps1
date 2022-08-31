@@ -21,6 +21,8 @@
 
 #TODO: Replace sentinel files with an XML file for each backup directory that lists the deleted files
 
+#Requires -Module Logging
+
 Param(
     [Parameter(  
         HelpMessage="Executes the script in testing mode"
@@ -33,20 +35,19 @@ Param(
     [switch]$LogToFile
 )
 
-Import-Module ".\Update-BackupFiles.ps1"
-Import-Module ".\Sync-DeletedDirectory.ps1"
+Import-Module ".\Update-BackupFiles.ps1"    -Force
+Import-Module ".\Sync-DeletedDirectory.ps1" -Force
+Import-Module ".\BackupMeta.psm1"           -Force
 
-# Constants
-$SENTINEL_FILE =  ".sentinel"
+$META_DIR = ".\meta\"
 
 # Config settings
 [xml]$config = Get-Content .\config.xml
 
+Add-LoggingTarget -Name Console
+Set-LoggingDefaultLevel -Level $config.Config.Logging.Level
 if ($LogToFile) {
-    #Requires -Module Logging
-
     $logDir = $config.Config.Logging.Directory
-    $logLevel = $config.Config.Logging.Level
     [int]$maxLogs = $config.Config.Logging.MaxLogFiles
 
     $nLogs = (Get-ChildItem $logDir | Measure-Object).Count
@@ -62,11 +63,9 @@ if ($LogToFile) {
 
         Remove-Item $oldestLogFile
     }
+
     $dtStr = Get-Date -Format "MM-dd-yyyy@HH-mm-ss"
     $logName = "Backup-Directories_Log_$dtStr.log"
-
-    Set-LoggingDefaultLevel -Level $logLevel
-    Add-LoggingTarget -Name Console
     Add-LoggingTarget -Name File -Configuration @{
         Path="$logDir\$logName"
     }
@@ -91,6 +90,7 @@ foreach ($target in $targetDirectories) {
     $targetName = (Select-String -Pattern ".+\\([^\\]+)\\?$" -InputObject $target).Matches.Groups[1].Value
     $backup = "$backupRootDirectory\$targetName"
     $backupExists = Test-Path -Path $backup
+    $metaPath = "$META_DIR\$targetName.xml"
 
     if (-not (Test-Path -Path $target) -and (-not $backupExists)) {
         Write-Log -Level ERROR "$target does not exist and there is no corresponding backup"
@@ -99,14 +99,19 @@ foreach ($target in $targetDirectories) {
         Write-Log -Level DEBUG "$targetName does not exist in backup directory."
         Copy-Item -Path $target -Destination $backup -Recurse
         Write-Log -Level INFO "Copied $target to $backup"
+
+        New-Meta $metaPath $targetName
+        Write-Log -Level DEBUG "Meta file $targetName.xml created"
     }
-    elseif ($null -ne (Get-ChildItem $target -Recurse -Exclude "*$SENTINEL_FILE" -ErrorAction Ignore)) {
+    elseif ($null -ne (Get-ChildItem $target -Recurse -ErrorAction Ignore)) {
         $backupCount++
-        Update-BackupFiles $target $targetName $backup $SENTINEL_FILE
+        Update-BackupFiles $target $targetName $backup $config $meta
     }
     else {
-        Sync-DeletedDirectory $target $backup $config $SENTINEL_FILE
+        Sync-DeletedDirectory $target $backup $config $meta
     }
+    # Process DeletedItems in meta file
+    Confirm-DeletedItems $metaPath
 }
 $timer.Stop()
 $seconds = $timer.Elapsed.TotalSeconds

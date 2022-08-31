@@ -13,10 +13,11 @@
         <DeleteBackupAfterTargetDeleted unit="Days">90</DeleteBackupAfterTargetDeleted>
     </FileRetention>
     <Test>
-        <BackupRootDirectory>.\backups\</BackupRootDirectory>
+        <BackupRootDirectory>$env:Temp\BackupTest\Backups\</BackupRootDirectory>
         <TargetDirectories>
-            <Main>.\main\</Main>
-            <Secondary>.\secondary\</Secondary>
+            <Target1>$env:Temp\BackupTest\Target1\</Target1>
+            <Target2>$env:Temp\BackupTest\Target2\</Target2>
+            <Target3>$env:Temp\BackupTest\Target3\</Target3>
         </TargetDirectories>
     </Test>
 </Config>

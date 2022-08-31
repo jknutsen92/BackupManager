@@ -1,16 +1,22 @@
-function Update-BackupFiles($TargetDirectory, $TargetName, $BackupDirectory, $SENTINEL_FILE) {
+Import-Module ".\BackupMeta.psm1" -Force
+
+function Update-BackupFiles($TargetDirectory, $TargetName, $BackupDirectory, $Config, $Meta) {
+    $deletedItems = Get-DeletedItemsFromMeta $Meta
     $filesExistDiff = Compare-Object `
-            -ReferenceObject (Get-ChildItem $BackupDirectory -Recurse -Exclude "*$SENTINEL_FILE") `
-            -DifferenceObject (Get-ChildItem $TargetDirectory -Recurse -Exclude "*.$SENTINEL_FILE") `
+            -ReferenceObject (Get-ChildItem $BackupDirectory -Recurse -Exclude $deletedItems) `
+            -DifferenceObject (Get-ChildItem $TargetDirectory -Recurse) `
             -Property Name
 
     foreach ($diff in $filesExistDiff) {
         if ($diff.SideIndicator -eq "<=") {
-            # Delete files from backup that were deleted in target
-            #TODO: Add a sentinel file and only delete after the delete period, and issue a warning
+            # For files that were deleted in target, flag their backups for deletion in meta file
             $destPath = (Get-ChildItem $BackupDirectory -Filter $diff.Name -Recurse).FullName
-            Remove-Item -Path $destPath
-            Write-Log -Level DEBUG "Deleted file in backup $destPath that was deleted in the target"
+            Add-DeletedItemToMeta $Meta (Get-Date) $destPath
+
+            $deleteTime = $Config.Config.FileRetention.DeleteBackupAfterTargetDeleted
+            $deleteUnits = $Config.Config.FileRetention.DeleteBackupAfterTargetDeleted.unit
+            Write-Log -Level WARNING `
+            "$destPath was deleted in the target directory. It will be deleted after $deleteTime $deleteUnits"
         }
         elseif ($diff.SideIndicator -eq "=>") {
             # Copy files that were added in target

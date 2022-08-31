@@ -164,6 +164,22 @@ Describe "Remove-DeletedItemFromMeta" {
     }
 }
 
+Describe "Get-DeletedItemsFromMeta" {
+    BeforeAll {
+        $metaPath = "$TEST_DIR\test.xml"
+        New-Meta $metaPath "TEST"
+        Add-DeletedItemToMeta $metaPath (Get-Date) $TEST_DIR
+        Add-DeletedItemToMeta $metaPath (Get-Date) $metaPath
+    }
+    it "Correctly returns array of path strings" {
+        $array = $TEST_DIR, $metaPath
+        Get-DeletedItemsFromMeta $metaPath | Should -Be $array
+    }
+    AfterAll {
+        Remove-Item -Path $metaPath
+    }
+}
+
 AfterAll {
     Remove-Item -Path $TEST_DIR -Recurse
 }
