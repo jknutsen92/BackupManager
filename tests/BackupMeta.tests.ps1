@@ -9,6 +9,7 @@ Describe "New-Meta" {
         $metaPath = "$TEST_DIR\test.xml"
         New-Meta $metaPath "TEST"
         [xml]$xml = Get-Content $metaPath
+        [void]$xml#Linting is annoying
     }
     It "Meta XML documents exists" {
         $metaPath | Should -Exist
@@ -98,9 +99,68 @@ Describe "Search-XmlDeletedItem" {
         $metaPath = "$TEST_DIR\test.xml"
         New-Meta $metaPath "TEST"
     }
-
+    it "Empty meta file returns null" {
+        [xml]$xml = Get-Content -Path $metaPath
+        Search-XmlDeletedItem $xml "." | Should -Be $null
+    }
+    it "Correctly finds a DeletedItem in meta" {
+        $nowDT = (Get-Date).ToString()
+        Add-DeletedItemToMeta $metaPath $nowDT $TEST_DIR
+        [xml]$xml = Get-Content -Path $metaPath
+        
+        $target = Search-XmlDeletedItem $xml $TEST_DIR
+        $target | Should -Not -Be $null
+        $target."#text" | Should -Be $TEST_DIR
+        $target.TimeDeleted | Should -Be $nowDT
+    }
+    it "Correctly returns null when searching for nonexistent deteled item" {
+        [xml]$xml = Get-Content -Path $metaPath
+        Search-XmlDeletedItem $xml "INVALID" | Should -Be $null
+    }
     AfterAll {
         Remove-Item -Path $metaPath
+    }
+}
+
+Describe "Remove-DeletedItemFromMeta" {
+    BeforeAll {
+        $metaPath = "$TEST_DIR\test.xml"
+        New-Meta $metaPath "TEST"
+        $subDir = "$TEST_DIR\SUB"
+        New-Item -Path "$subDir" -ItemType Directory
+        New-Item -Path "$subDir\a.txt" -ItemType File
+        New-Item -Path "$subDir\b.txt" -ItemType File
+        New-Item -Path "$subDir\c.txt" -ItemType File
+
+        $nowDT = (Get-Date).ToString()
+        Add-DeletedItemToMeta $metaPath $nowDT "$subDir\a.txt"
+        Add-DeletedItemToMeta $metaPath $nowDT "$subDir\b.txt"
+        Add-DeletedItemToMeta $metaPath $nowDT "$subDir\c.txt"
+    }
+    it "Correctly removes only target DeletedItem" {
+        Remove-DeletedItemFromMeta $metaPath "$subDir\b.txt"
+
+        Assert-MetaDeletedItem $metaPath "$subDir\a.txt" | Should -BeTrue
+        Assert-MetaDeletedItem $metaPath "$subDir\b.txt" | Should -BeFalse
+        Assert-MetaDeletedItem $metaPath "$subDir\c.txt" | Should -BeTrue
+    }
+    it "Makes no changes when target is nonexistent" {
+        Remove-DeletedItemFromMeta $metaPath "$subDir\d.txt"
+
+        Assert-MetaDeletedItem $metaPath "$subDir\a.txt" | Should -BeTrue
+        Assert-MetaDeletedItem $metaPath "$subDir\b.txt" | Should -BeFalse
+        Assert-MetaDeletedItem $metaPath "$subDir\c.txt" | Should -BeTrue
+    }
+    It "Attempting to remove an element again does nothing" {
+        Remove-DeletedItemFromMeta $metaPath "$subDir\b.txt"
+
+        Assert-MetaDeletedItem $metaPath "$subDir\a.txt" | Should -BeTrue
+        Assert-MetaDeletedItem $metaPath "$subDir\b.txt" | Should -BeFalse
+        Assert-MetaDeletedItem $metaPath "$subDir\c.txt" | Should -BeTrue
+    }
+    AfterAll {
+        Remove-Item -Path $metaPath
+        Remove-Item -Path $subDir -Recurse
     }
 }
 
