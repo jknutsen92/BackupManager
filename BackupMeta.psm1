@@ -19,10 +19,12 @@ function New-Meta($Path, $BackupName) {
     $xml.Save($Path)
 }
 
-function Search-MetaDeletedItem($Meta, $Path) {
-    [xml]$xml = Get-Content -Path $Meta
-
-    $deletedItem =  $xml.SelectNodes("/Meta/DeletedItems").DeletedItem | 
+function Search-XmlDeletedItem($Xml, $Path) {
+    if ($Xml.GetType().Name -ne "XmlDocument") {
+        Write-Log -Level ERROR "$Xml is not a valid XML document"
+        throw [System.ArgumentException]::New("$Xml is not a valid XML document")
+    }
+    $deletedItem =  $Xml.SelectNodes("/Meta/DeletedItems").DeletedItem | 
                     Where-Object -Property "#text" -eq "$Path"
 
     return $deletedItem
@@ -52,9 +54,8 @@ function Add-DeletedItemToMeta($Meta, $TimeDeleted, $Path) {
         throw [System.ArgumentException]::New("$Path is not a valid path")
     }
 
-    [xml]$xml = Get-Content -Path $Meta -ErrorAction Stop
-
     if (-not (Assert-MetaDeletedItem $Meta $Path)) {
+        [xml]$xml = Get-Content -Path $Meta -ErrorAction Stop
         $deletedItems = $xml.SelectSingleNode("/Meta/DeletedItems")
 
         $newDeleted = $xml.CreateNode("element", "DeletedItem", $null)
@@ -73,10 +74,9 @@ function Add-DeletedItemToMeta($Meta, $TimeDeleted, $Path) {
 function Remove-DeletedItemFromMeta($Meta, $Path) {
     [xml]$xml = Get-Content -Path $Meta -ErrorAction Stop
 
-    $deletedItem = Search-MetaDeletedItem $Meta $Path
+    $deletedItem = Search-XmlDeletedItem $xml $Path
     if ($null -ne $deletedItem) {
-        #TODO: Fix this so that the element is actually removed from the document
-        $xml.SelectSingleNode("/Meta/DeletedItems").RemoveChild($deletedItem)
+        [void]$xml.Meta.DeletedItems.RemoveChild($deletedItem)
         $xml.Save($Meta)
     }
     else {
@@ -84,5 +84,3 @@ function Remove-DeletedItemFromMeta($Meta, $Path) {
         Wait-Logging
     }
 }
-
-Remove-DeletedItemFromMeta $meta ".\target\"
