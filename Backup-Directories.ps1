@@ -19,8 +19,6 @@
     Date:   August 25, 2022    
 #>
 
-#TODO: Replace sentinel files with an XML file for each backup directory that lists the deleted files
-
 #Requires -Module Logging
 
 Param(
@@ -36,7 +34,7 @@ Param(
 )
 
 Import-Module ".\Update-BackupFiles.ps1"    -Force
-Import-Module ".\Sync-DeletedDirectory.ps1" -Force
+Import-Module ".\Confirm-DeletedItems.ps1"  -Force
 Import-Module ".\BackupMeta.psm1"           -Force
 
 $META_DIR = ".\meta\"
@@ -108,10 +106,11 @@ foreach ($target in $targetDirectories) {
         Update-BackupFiles $target $targetName $backup $config $meta
     }
     else {
-        Sync-DeletedDirectory $target $backup $config $meta
+        # Target directory was deleted
+        Add-DeletedItemToMeta $metaPath (Get-Date) $backup $target
     }
     # Process DeletedItems in meta file
-    Confirm-DeletedItems $metaPath
+    Confirm-DeletedItems $metaPath $config
 }
 $timer.Stop()
 $seconds = $timer.Elapsed.TotalSeconds

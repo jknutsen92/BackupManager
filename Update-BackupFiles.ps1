@@ -1,7 +1,7 @@
 Import-Module ".\BackupMeta.psm1" -Force
 
 function Update-BackupFiles($TargetDirectory, $TargetName, $BackupDirectory, $Config, $Meta) {
-    $deletedItems = Get-DeletedItemsFromMeta $Meta
+    $deletedItems = (Get-DeletedItemsFromMeta $Meta).PathInBackup
     $filesExistDiff = Compare-Object `
             -ReferenceObject (Get-ChildItem $BackupDirectory -Recurse -Exclude $deletedItems) `
             -DifferenceObject (Get-ChildItem $TargetDirectory -Recurse) `
@@ -12,11 +12,6 @@ function Update-BackupFiles($TargetDirectory, $TargetName, $BackupDirectory, $Co
             # For files that were deleted in target, flag their backups for deletion in meta file
             $destPath = (Get-ChildItem $BackupDirectory -Filter $diff.Name -Recurse).FullName
             Add-DeletedItemToMeta $Meta (Get-Date) $destPath
-
-            $deleteTime = $Config.Config.FileRetention.DeleteBackupAfterTargetDeleted
-            $deleteUnits = $Config.Config.FileRetention.DeleteBackupAfterTargetDeleted.unit
-            Write-Log -Level WARNING `
-            "$destPath was deleted in the target directory. It will be deleted after $deleteTime $deleteUnits"
         }
         elseif ($diff.SideIndicator -eq "=>") {
             # Copy files that were added in target

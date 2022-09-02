@@ -1,12 +1,16 @@
 BeforeAll {
     Import-Module "$env:Projects\Powershell\BackupManager\BackupMeta.psm1" -Force
-    $TEST_DIR = "$env:TEMP\UnitTest-BackupMeta"
-    New-Item -Path $TEST_DIR -ItemType Directory -ErrorAction Ignore
+    $TEST_ROOT  = "$env:TEMP\UnitTest-BackupMeta"
+    $BACKUP_DIR = "$TEST_ROOT\Backup"
+    $TARGET_DIR = "$TEST_ROOT\Target"
+    New-Item -Path $TEST_ROOT -ItemType Directory
+    New-Item -Path $BACKUP_DIR -ItemType Directory
+    New-Item -Path $TARGET_DIR -ItemType Directory
 }
 
 Describe "New-Meta" {
     BeforeAll {
-        $metaPath = "$TEST_DIR\test.xml"
+        $metaPath = "$TEST_ROOT\test.xml"
         New-Meta $metaPath "TEST"
         [xml]$xml = Get-Content $metaPath
         [void]$xml#Linting is annoying
@@ -30,41 +34,44 @@ Describe "New-Meta" {
 
 Describe "Add-DeletedItemToMeta" {
     BeforeAll {
-        $metaPath = "$TEST_DIR\test.xml"
+        $metaPath = "$TEST_ROOT\test.xml"
         New-Meta $metaPath "TEST"
     }
     it "DeletedItem is correct" {
         $nowDT = (Get-Date).ToString()
-        $path = $TEST_DIR
-        Add-DeletedItemToMeta $metaPath $nowDT $path
+        $backupPath = $BACKUP_DIR
+        $targetPath = $TARGET_DIR
+        Add-DeletedItemToMeta $metaPath $nowDT $backupPath $targetPath
 
         [xml]$xml = Get-Content -Path $metaPath
         ($xml.Meta.DeletedItems.DeletedItem | Measure-Object).Count | Should -Be 1
 
         $deletedItem = $xml.Meta.DeletedItems.DeletedItem
         $deletedItem.TimeDeleted | Should -Be $nowDt
-
-        $deletedItem."#text" | Should -Be $path
+        $deletedItem.PathInTarget | Should -Be $targetPath
+        $deletedItem."#text" | Should -Be $backupPath
     }
     it "Duplicate DeletedItem is ignored" {
         $nowDT = (Get-Date).ToString()
-        $path = $TEST_DIR
-        Add-DeletedItemToMeta $metaPath $nowDT $path
+        $backupPath = $BACKUP_DIR
+        $targetPath = $TARGET_DIR
+        Add-DeletedItemToMeta $metaPath $nowDT $backupPath $targetPath
 
         [xml]$xml = Get-Content -Path $metaPath
         ($xml.Meta.DeletedItems.DeletedItem | Measure-Object).Count | Should -Be 1
     }
     it "Distinct DeletedItem is added properly" {
         $nowDT = (Get-Date).ToString()
-        $path = "$TEST_DIR\test.xml"
-        Add-DeletedItemToMeta $metaPath $nowDT $path
+        $backupPath = "$TEST_ROOT\test.xml"
+        $targetPath = $TARGET_DIR
+        Add-DeletedItemToMeta $metaPath $nowDT $backupPath $targetPath
 
         [xml]$xml = Get-Content -Path $metaPath
         ($xml.Meta.DeletedItems.DeletedItem | Measure-Object).Count | Should -Be 2
 
         $newDeletedItem = $xml.Meta.DeletedItems.DeletedItem[1]
-        $newDeletedItem."#text" | Should -Be $path
-
+        $newDeletedItem."#text" | Should -Be $backupPath
+        $newDeletedItem.PathInTarget | Should -Be $targetPath
         $newDeletedItem.TimeDeleted | Should -Be $nowDT
     }
     AfterAll {
@@ -74,20 +81,21 @@ Describe "Add-DeletedItemToMeta" {
 
 Describe "Assert-MetaDeletedItem" {
     BeforeAll {
-        $metaPath = "$TEST_DIR\test.xml"
+        $metaPath = "$TEST_ROOT\test.xml"
         New-Meta $metaPath "TEST"
     }
     it "Returns false for empty meta file" {
         Assert-MetaDeletedItem $metaPath "." | Should -BeFalse
     }
     it "Returns true for corresponding deleted item" {
-        $path = $TEST_DIR
-        Add-DeletedItemToMeta $metaPath (Get-Date) $path
+        $backupPath = $BACKUP_DIR
+        $targetPath = $TARGET_DIR
+        Add-DeletedItemToMeta $metaPath (Get-Date) $backupPath $targetPath
 
-        Assert-MetaDeletedItem $metaPath $path | Should -BeTrue
+        Assert-MetaDeletedItem $metaPath $backupPath | Should -BeTrue
     }
     it "Returns false for nonexistent deleted item" {
-        Assert-MetaDeletedItem $metaPath "$TEST_DIR\1" | Should -BeFalse
+        Assert-MetaDeletedItem $metaPath "$BACKUP_DIR\1" | Should -BeFalse
     }
     AfterAll {
         Remove-Item -Path $metaPath
@@ -96,7 +104,7 @@ Describe "Assert-MetaDeletedItem" {
 
 Describe "Search-XmlDeletedItem" {
     BeforeAll {
-        $metaPath = "$TEST_DIR\test.xml"
+        $metaPath = "$TEST_ROOT\test.xml"
         New-Meta $metaPath "TEST"
     }
     it "Empty meta file returns null" {
@@ -105,15 +113,16 @@ Describe "Search-XmlDeletedItem" {
     }
     it "Correctly finds a DeletedItem in meta" {
         $nowDT = (Get-Date).ToString()
-        Add-DeletedItemToMeta $metaPath $nowDT $TEST_DIR
+        Add-DeletedItemToMeta $metaPath $nowDT $BACKUP_DIR $TARGET_DIR
         [xml]$xml = Get-Content -Path $metaPath
         
-        $target = Search-XmlDeletedItem $xml $TEST_DIR
+        $target = Search-XmlDeletedItem $xml $BACKUP_DIR
         $target | Should -Not -Be $null
-        $target."#text" | Should -Be $TEST_DIR
+        $target."#text" | Should -Be $BACKUP_DIR
         $target.TimeDeleted | Should -Be $nowDT
+        $target.PathInTarget | Should -Be $TARGET_DIR
     }
-    it "Correctly returns null when searching for nonexistent deteled item" {
+    it "Correctly returns null when searching for nonexistent deleted item" {
         [xml]$xml = Get-Content -Path $metaPath
         Search-XmlDeletedItem $xml "INVALID" | Should -Be $null
     }
@@ -124,18 +133,18 @@ Describe "Search-XmlDeletedItem" {
 
 Describe "Remove-DeletedItemFromMeta" {
     BeforeAll {
-        $metaPath = "$TEST_DIR\test.xml"
+        $metaPath = "$TEST_ROOT\test.xml"
         New-Meta $metaPath "TEST"
-        $subDir = "$TEST_DIR\SUB"
+        $subDir = "$BACKUP_DIR\SUB"
         New-Item -Path "$subDir" -ItemType Directory
         New-Item -Path "$subDir\a.txt" -ItemType File
         New-Item -Path "$subDir\b.txt" -ItemType File
         New-Item -Path "$subDir\c.txt" -ItemType File
 
         $nowDT = (Get-Date).ToString()
-        Add-DeletedItemToMeta $metaPath $nowDT "$subDir\a.txt"
-        Add-DeletedItemToMeta $metaPath $nowDT "$subDir\b.txt"
-        Add-DeletedItemToMeta $metaPath $nowDT "$subDir\c.txt"
+        Add-DeletedItemToMeta $metaPath $nowDT "$subDir\a.txt" $TARGET_DIR
+        Add-DeletedItemToMeta $metaPath $nowDT "$subDir\b.txt" $TARGET_DIR
+        Add-DeletedItemToMeta $metaPath $nowDT "$subDir\c.txt" $TARGET_DIR
     }
     it "Correctly removes only target DeletedItem" {
         Remove-DeletedItemFromMeta $metaPath "$subDir\b.txt"
@@ -166,14 +175,21 @@ Describe "Remove-DeletedItemFromMeta" {
 
 Describe "Get-DeletedItemsFromMeta" {
     BeforeAll {
-        $metaPath = "$TEST_DIR\test.xml"
+        $metaPath = "$TEST_ROOT\test.xml"
         New-Meta $metaPath "TEST"
-        Add-DeletedItemToMeta $metaPath (Get-Date) $TEST_DIR
-        Add-DeletedItemToMeta $metaPath (Get-Date) $metaPath
+        $nowDT = (Get-Date).ToString()
+        Add-DeletedItemToMeta $metaPath $nowDt $BACKUP_DIR $TARGET_DIR
+        Add-DeletedItemToMeta $metaPath $nowDT $metaPath $TARGET_DIR
     }
-    it "Correctly returns array of path strings" {
-        $array = $TEST_DIR, $metaPath
-        Get-DeletedItemsFromMeta $metaPath | Should -Be $array
+    it "Correctly returns array of objects containing 'PathInBackup,' 'PathInTarget,' and 'TimeDeleted'" {
+        $backupDirs = $BACKUP_DIR, $metaPath
+        $targetDirs = $TARGET_DIR, $TARGET_DIR
+        $DTs = $nowDT, $nowDT
+
+        $deletedItems = Get-DeletedItemsFromMeta $metaPath
+        $deletedItems.PathInBackup | Should -Be $backupDirs
+        $deletedItems.PathInTarget | Should -Be $targetDirs
+        $deletedItems.TimeDeleted | Should -Be $DTs
     }
     AfterAll {
         Remove-Item -Path $metaPath
@@ -181,5 +197,5 @@ Describe "Get-DeletedItemsFromMeta" {
 }
 
 AfterAll {
-    Remove-Item -Path $TEST_DIR -Recurse
+    Remove-Item -Path $TEST_ROOT -Recurse
 }

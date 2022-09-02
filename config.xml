@@ -2,7 +2,7 @@
 <Config>
     <BackupRootDirectory>E:\windows\</BackupRootDirectory>
     <TargetDirectories>
-        <Notes>C:\Users\jknut\Desktop\Notes\</Notes>
+        <TargetDirectory>C:\Users\jknut\Desktop\Notes\</TargetDirectory>
     </TargetDirectories>
     <Logging>
         <Level>DEBUG</Level>
@@ -13,11 +13,9 @@
         <DeleteBackupAfterTargetDeleted unit="Days">90</DeleteBackupAfterTargetDeleted>
     </FileRetention>
     <Test>
-        <BackupRootDirectory>$env:Temp\BackupTest\Backups\</BackupRootDirectory>
+        <BackupRootDirectory>C:\Users\jknut\AppData\Local\Temp\BackupManagerTest\Backups</BackupRootDirectory>
         <TargetDirectories>
-            <Target1>$env:Temp\BackupTest\Target1\</Target1>
-            <Target2>$env:Temp\BackupTest\Target2\</Target2>
-            <Target3>$env:Temp\BackupTest\Target3\</Target3>
+            <TargetDirectory>C:\Users\jknut\AppData\Local\Temp\BackupManagerTest\Target</TargetDirectory>
         </TargetDirectories>
     </Test>
 </Config>

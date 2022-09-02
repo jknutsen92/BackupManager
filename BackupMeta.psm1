@@ -1,3 +1,4 @@
+#TODO: Handle TargetPath vs BackupPath in meta files
 function New-Meta($Path, $BackupName) {
     if (Test-Path -Path $Path) {
         Write-Log -Level ERROR "A meta file for $Path already exists"
@@ -19,22 +20,22 @@ function New-Meta($Path, $BackupName) {
     $xml.Save($Path)
 }
 
-function Search-XmlDeletedItem($Xml, $Path) {
+function Search-XmlDeletedItem($Xml, $PathInBackup) {
     if ($Xml.GetType().Name -ne "XmlDocument") {
         Write-Log -Level ERROR "$Xml is not a valid XML document"
         throw [System.ArgumentException]::New("$Xml is not a valid XML document")
     }
     $deletedItem =  $Xml.SelectNodes("/Meta/DeletedItems").DeletedItem | 
-                    Where-Object -Property "#text" -eq "$Path"
+                    Where-Object -Property "#text" -eq "$PathInBackup"
 
     return $deletedItem
 }
 
-function Assert-MetaDeletedItem($Meta, $Path) {
+function Assert-MetaDeletedItem($Meta, $PathInBackup) {
     [xml]$xml = Get-Content -Path $Meta
 
     $deletedItem =  $xml.SelectNodes("/Meta/DeletedItems").DeletedItem | 
-                    Where-Object -Property "#text" -eq "$Path"
+                    Where-Object -Property "#text" -eq "$PathInBackup"
 
     if ($null -ne $deletedItem) {
         return $true
@@ -42,50 +43,71 @@ function Assert-MetaDeletedItem($Meta, $Path) {
     return $false
 }
 
-function Add-DeletedItemToMeta($Meta, $TimeDeleted, $Path) {
+function Add-DeletedItemToMeta($Meta, $TimeDeleted, $PathInBackup, $PathInTarget) {
     if ((Get-Date).GetType().Name -ne "DateTime") {
         Write-Log -Level "ERROR" "$TimeDeleted is not a valid DateTime object"
         Wait-Logging
         throw [System.ArgumentException]::New("$TimeDeleted is not a valid DateTime object")
     }
-    if (-not (Test-Path -Path $Path)) {
-        Write-Log -Level "ERROR" "$Path is not a valid path"
+    if (-not (Test-Path -Path $PathInBackup)) {
+        Write-Log -Level "ERROR" "$PathInBackup is not a valid backup path"
         Wait-Logging
-        throw [System.ArgumentException]::New("$Path is not a valid path")
+        throw [System.ArgumentException]::New("$PathInBackup is not a valid backup path")
+    }
+    if (-not (Test-Path -Path $PathInTarget)) {
+        Write-Log -Level "ERROR" "$PathInTarget is not a valid path"
+        Wait-Logging
+        throw [System.ArgumentException]::New("$PathInTarget is not a valid path")
+    }
+    if ($PathInBackup -eq $PathInTarget) {
+        Write-Log -Level "ERROR" "The target path and backup path cannot be the same"
+        Wait-Logging
+        throw [System.ArgumentException]::New("The target path and backup path cannot be the same")
     }
 
-    if (-not (Assert-MetaDeletedItem $Meta $Path)) {
+    if (-not (Assert-MetaDeletedItem $Meta $PathInBackup)) {
         [xml]$xml = Get-Content -Path $Meta -ErrorAction Stop
         $deletedItems = $xml.SelectSingleNode("/Meta/DeletedItems")
 
         $newDeleted = $xml.CreateNode("element", "DeletedItem", $null)
         $newDeleted.SetAttribute("TimeDeleted", $TimeDeleted)
-        $newDeleted.InnerText = $Path
+        $newDeleted.SetAttribute("PathInTarget", $PathInTarget)
+        $newDeleted.InnerText = $PathInBackup
         
         [void]$deletedItems.AppendChild($newDeleted)
         $xml.Save($Meta)
     }
     else {
-        Write-Log -Level WARNING "$Path already exists in $Meta"
+        Write-Log -Level WARNING "$PathInBackup already exists in $Meta"
         Wait-Logging
     }
 }
 
-function Remove-DeletedItemFromMeta($Meta, $Path) {
+function Remove-DeletedItemFromMeta($Meta, $PathInBackup) {
     [xml]$xml = Get-Content -Path $Meta -ErrorAction Stop
 
-    $deletedItem = Search-XmlDeletedItem $xml $Path
+    $deletedItem = Search-XmlDeletedItem $xml $PathInBackup
     if ($null -ne $deletedItem) {
         [void]$xml.Meta.DeletedItems.RemoveChild($deletedItem)
         $xml.Save($Meta)
     }
     else {
-        Write-Log -Level ERROR "$Path does not exist in $Meta"
+        Write-Log -Level ERROR "$PathInBackup does not exist in $Meta"
         Wait-Logging
     }
 }
 
 function Get-DeletedItemsFromMeta($Meta) {
     [xml]$xml = Get-Content -Path $Meta -ErrorAction Stop
-    return $xml.Meta.DeletedItems.DeletedItem."#text"
+    $deletedItems = $xml.Meta.DeletedItems.DeletedItem
+
+    $arr = [System.Collections.ArrayList]@()
+    foreach($deletedItem in $deletedItems) {
+        $arr += [pscustomobject]@{
+            "PathInBackup"=$deletedItem."#text";
+            "PathInTarget"=$deletedItem.PathInTarget;
+            "TimeDeleted"=$deletedItem.TimeDeleted
+        }
+    }
+    return $arr
 }
