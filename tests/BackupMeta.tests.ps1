@@ -196,6 +196,28 @@ Describe "Get-DeletedItemsFromMeta" {
     }
 }
 
+Describe "Set-TimeDeleted" {
+    BeforeAll {
+        $metaPath = "$TEST_ROOT\test.xml"
+        New-Meta $metaPath "TEST"
+        $nowDT = (Get-Date).ToString()
+        $beforeDT = ((Get-Date) - (New-TimeSpan -Days 10)).ToString()
+        Add-DeletedItemToMeta $metaPath $nowDt $BACKUP_DIR $TARGET_DIR
+    }
+    it "TimeDeleted is correctly modified" {
+        $deletedItem = (Get-DeletedItemsFromMeta $metaPath)[0]
+        $deletedItem.TimeDeleted | Should -Be $nowDT
+
+        Set-TimeDeleted $metaPath $BACKUP_DIR $beforeDT
+
+        $deletedItem = (Get-DeletedItemsFromMeta $metaPath)[0]
+        $deletedItem.TimeDeleted | Should -Be $beforeDT
+    }
+    AfterAll {
+        Remove-Item -Path $metaPath
+    }
+}
+
 AfterAll {
     Remove-Item -Path $TEST_ROOT -Recurse
 }

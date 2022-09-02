@@ -111,3 +111,12 @@ function Get-DeletedItemsFromMeta($Meta) {
     }
     return $arr
 }
+
+function Set-TimeDeleted($Meta, $PathInBackup, $NewTimeDeleted) {
+    [xml]$xml = Get-Content -Path $Meta
+    $deletedItem = Search-XmlDeletedItem $xml $PathInBackup
+    if ($null -ne $deletedItem) {
+        $deletedItem.TimeDeleted = $NewTimeDeleted
+    }
+    $xml.Save($Meta)
+}

@@ -16,13 +16,14 @@ function Confirm-DeletedItems($Meta, $Config) {
 
         if (Test-Path -Path $targetPath) {
             Write-Log -Level INFO "$targetPath has been restored or overwritten"
-            Remove-DeletedItemsFromMeta $Meta $backupPath
+            Remove-DeletedItemFromMeta $Meta $backupPath
             Write-Log -Level INFO "$backupPath has been removed from deleted items in meta file"
         }
         elseif ($nowDT -ge ($deletePeriod + $timeDeleted)) {
             Write-Log -Level INFO "$backupPath has expired and will be deleted"
-            Remove-Item -Path $backupPath
+            Remove-Item -Path $backupPath -Recurse -ErrorAction SilentlyContinue
             Write-Log -Level INFO "$backupPath deleted"
+            Remove-DeletedItemFromMeta $Meta $backupPath
         }
         else {
             Write-Log -Level WARNING "$backupPath will be deleted after $($deletePeriod + $timeDeleted)"
