@@ -12,21 +12,22 @@ function Confirm-DeletedItems($Meta, $Config) {
     foreach ($deletedItem in $deletedItems) {
         $backupPath = $deletedItem.PathInBackup
         $targetPath = $deletedItem.PathInTarget
-        $timeDeleted = $deletedItem.TimeDeleted
+        $timeDeleted = [DateTime]$deletedItem.TimeDeleted
+        $expirationDT = $timeDeleted + $deletePeriod
 
         if (Test-Path -Path $targetPath) {
             Write-Log -Level INFO "$targetPath has been restored or overwritten"
             Remove-DeletedItemFromMeta $Meta $backupPath
             Write-Log -Level INFO "$backupPath has been removed from deleted items in meta file"
         }
-        elseif ($nowDT -ge ($deletePeriod + $timeDeleted)) {
+        elseif ($nowDT -ge $expirationDT) {
             Write-Log -Level INFO "$backupPath has expired and will be deleted"
             Remove-Item -Path $backupPath -Recurse -ErrorAction SilentlyContinue
             Write-Log -Level INFO "$backupPath deleted"
             Remove-DeletedItemFromMeta $Meta $backupPath
         }
         else {
-            Write-Log -Level WARNING "$backupPath will be deleted after $($deletePeriod + $timeDeleted)"
+            Write-Log -Level WARNING "$backupPath will be deleted after $expirationDT"
         }
     }
 }

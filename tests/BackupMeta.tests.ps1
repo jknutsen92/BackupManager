@@ -185,11 +185,13 @@ Describe "Get-DeletedItemsFromMeta" {
         $backupDirs = $BACKUP_DIR, $metaPath
         $targetDirs = $TARGET_DIR, $TARGET_DIR
         $DTs = $nowDT, $nowDT
+        $itemNames = "Backup", "test.xml"
 
         $deletedItems = Get-DeletedItemsFromMeta $metaPath
         $deletedItems.PathInBackup | Should -Be $backupDirs
         $deletedItems.PathInTarget | Should -Be $targetDirs
         $deletedItems.TimeDeleted | Should -Be $DTs
+        $deletedItems.ItemName | Should -Be $itemNames
     }
     AfterAll {
         Remove-Item -Path $metaPath

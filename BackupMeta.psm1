@@ -1,4 +1,3 @@
-#TODO: Handle TargetPath vs BackupPath in meta files
 function New-Meta($Path, $BackupName) {
     if (Test-Path -Path $Path) {
         Write-Log -Level ERROR "A meta file for $Path already exists"
@@ -17,7 +16,7 @@ function New-Meta($Path, $BackupName) {
     $deletedItems = $xml.CreateNode("element", "DeletedItems", $null)
     [void]$root.AppendChild($deletedItems)
 
-    $xml.Save($Path)
+    [void]$xml.Save($Path)
 }
 
 function Search-XmlDeletedItem($Xml, $PathInBackup) {
@@ -54,11 +53,7 @@ function Add-DeletedItemToMeta($Meta, $TimeDeleted, $PathInBackup, $PathInTarget
         Wait-Logging
         throw [System.ArgumentException]::New("$PathInBackup is not a valid backup path")
     }
-    if (-not (Test-Path -Path $PathInTarget)) {
-        Write-Log -Level "ERROR" "$PathInTarget is not a valid path"
-        Wait-Logging
-        throw [System.ArgumentException]::New("$PathInTarget is not a valid path")
-    }
+    
     if ($PathInBackup -eq $PathInTarget) {
         Write-Log -Level "ERROR" "The target path and backup path cannot be the same"
         Wait-Logging
@@ -103,10 +98,12 @@ function Get-DeletedItemsFromMeta($Meta) {
 
     $arr = [System.Collections.ArrayList]@()
     foreach($deletedItem in $deletedItems) {
+        $itemName = (Select-String -Pattern "^.+\\(.+)$" -InputObject $deletedItem."#text").Matches.Groups[1].Value
         $arr += [pscustomobject]@{
             "PathInBackup"=$deletedItem."#text";
             "PathInTarget"=$deletedItem.PathInTarget;
-            "TimeDeleted"=$deletedItem.TimeDeleted
+            "TimeDeleted"=$deletedItem.TimeDeleted;
+            "ItemName"=$itemName
         }
     }
     return $arr

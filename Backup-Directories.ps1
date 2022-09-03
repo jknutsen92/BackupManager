@@ -88,28 +88,28 @@ foreach ($target in $targetDirectories) {
     $targetName = (Select-String -Pattern ".+\\([^\\]+)\\?$" -InputObject $target).Matches.Groups[1].Value
     $backup = "$backupRootDirectory\$targetName"
     $backupExists = Test-Path -Path $backup
+    $targetExists = Test-Path -Path $target
     $metaPath = "$META_DIR\$targetName.xml"
 
-    if (-not (Test-Path -Path $target) -and (-not $backupExists)) {
+    if (-not ($targetExists) -and (-not $backupExists)) {
         Write-Log -Level ERROR "$target does not exist and there is no corresponding backup"
     }
     elseif (-not $backupExists) {
-        Write-Log -Level DEBUG "$targetName does not exist in backup directory."
+        $backupCount++
+        Write-Log -Level DEBUG "$targetName does not exist in backup directory. Copying $target to $backup.."
         Copy-Item -Path $target -Destination $backup -Recurse
         Write-Log -Level INFO "Copied $target to $backup"
 
         New-Meta $metaPath $targetName
         Write-Log -Level DEBUG "Meta file $targetName.xml created"
     }
-    elseif ($null -ne (Get-ChildItem $target -Recurse -ErrorAction Ignore)) {
+    elseif ($targetExists) {
         $backupCount++
         Update-BackupFiles $target $targetName $backup $config $meta
     }
     else {
-        # Target directory was deleted
         Add-DeletedItemToMeta $metaPath (Get-Date) $backup $target
     }
-    # Process DeletedItems in meta file
     Confirm-DeletedItems $metaPath $config
 }
 $timer.Stop()
