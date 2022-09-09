@@ -1,8 +1,14 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <Config>
-    <BackupRootDirectory>E:\windows\</BackupRootDirectory>
+    <!-- 
+        <BackupRootDirectory>E:\windows\</BackupRootDirectory>
+    -->
+    <BackupRootDirectory>C:\Users\jknut\Desktop</BackupRootDirectory>
     <TargetDirectories>
-        <TargetDirectory>C:\Users\jknut\Desktop\Notes\</TargetDirectory>
+        <!-- 
+            <TargetDirectory>C:\Users\jknut\Desktop\Notes\</TargetDirectory>
+        -->
+        <TargetDirectory>C:\Users\jknut\Desktop\Notes\School\ACO 331</TargetDirectory>
     </TargetDirectories>
     <Logging>
         <Level>DEBUG</Level>
