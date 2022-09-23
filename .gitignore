@@ -4,3 +4,4 @@ main/
 secondary/
 *.txt
 *.log
+meta/*

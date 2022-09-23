@@ -19,6 +19,7 @@
     Date:   August 25, 2022    
 #>
 
+#Requires -Version 7.0
 #Requires -Module Logging
 
 Param(
@@ -34,13 +35,13 @@ Param(
 )
 
 Import-Module ".\Update-BackupFiles.ps1"    -Force
-Import-Module ".\Confirm-DeletedItems.ps1"  -Force
-Import-Module ".\BackupMeta.psm1"           -Force
 
 $META_DIR = ".\meta\"
 
 # Config settings
-[xml]$config = Get-Content .\config.xml
+[xml]$config = Get-Content ".\config.xml"
+
+#TODO: Change log file management to use the module's implmentation
 
 Add-LoggingTarget -Name Console
 Set-LoggingDefaultLevel -Level $config.Config.Logging.Level
@@ -84,35 +85,27 @@ $timer = [Diagnostics.Stopwatch]::StartNew()
 
 $backupCount = 0
 foreach ($target in $targetDirectories) {
-    Write-Log -Level DEBUG "Accessing target directory $target"
+    Write-Log -Level DEBUG "Starting backup for '$target'"
     $targetName = (Select-String -Pattern ".+\\([^\\]+)\\?$" -InputObject $target).Matches.Groups[1].Value
     $backup = "$backupRootDirectory\$targetName"
     $backupExists = Test-Path -Path $backup
-    $targetExists = Test-Path -Path $target
     $metaPath = "$META_DIR\$targetName.xml"
 
-    if (-not ($targetExists) -and (-not $backupExists)) {
-        Write-Log -Level ERROR "$target does not exist and there is no corresponding backup"
-    }
-    elseif (-not $backupExists) {
+    if (-not $backupExists) {
         $backupCount++
-        Write-Log -Level DEBUG "$targetName does not exist in backup directory. Copying $target to $backup.."
+        Write-Log -Level INFO "'$targetName' does not exist in backup directory. Copying '$target' to '$backup'.."
         Copy-Item -Path $target -Destination $backup -Recurse
-        Write-Log -Level INFO "Copied $target to $backup"
+        Write-Log -Level INFO "Copied '$target' to '$backup'"
 
-        New-Meta $metaPath $targetName
-        Write-Log -Level DEBUG "Meta file $targetName.xml created"
-    }
-    elseif ($targetExists) {
-        $backupCount++
-        Update-BackupFiles $target $targetName $backup $config $meta
+        New-Meta $metaPath $targetName $target
+        Write-Log -Level DEBUG "Meta file '$targetName.xml' created in $META_DIR"
     }
     else {
-        Add-DeletedItemToMeta $metaPath (Get-Date) $backup $target
+        $backupCount++
+        Update-BackupFiles $target $backup $metaPath $config
     }
-    Confirm-DeletedItems $metaPath $config
 }
 $timer.Stop()
 $seconds = $timer.Elapsed.TotalSeconds
-Write-Log -Level INFO "Backups completed in $seconds seconds. $backupCount directories backed-up"
+Write-Log -Level INFO "Backups completed in $seconds seconds. $backupCount directories backed up"
 Wait-Logging
