@@ -30,19 +30,30 @@ function Update-BackupFiles($TargetDirectory, $BackupDirectory, $Meta, $Config) 
     if ($targetExists) {
         # Target directory is valid, update child directories
         Compare-Directories $TargetDirectory $BackupDirectory $xmlDocument $directoryElement $deletePeriod
+        $xmlDocument.Save($Meta)
     }
-    elseif ([Boolean]$xmlDocument.Meta.TargetDeleted) {
+    elseif ([System.Convert]::ToBoolean($xmlDocument.Meta.TargetDeleted)) {
         # Target directory was deleted since last backup
         $expirationDT = [DateTime]$xmlDocument.Meta.TimeDeleted + $deletePeriod
-        Write-Log -Level WARNING "'$TargetDirectory' will expire and be deleted on $expirationDT "
+        if ((Get-Date) -ge $expirationDT) {
+            # Target directory has expired
+            Remove-Item -Path $BackupDirectory -Recurse
+            Remove-Item -Path $Meta
+            Write-Log -Level INFO "'$TargetDirectory' has expired and '$BackupDirectory' has been deleted"
+        }
+        else {
+            # Target directory has not yet expired
+            Write-Log -Level WARNING "'$TargetDirectory' will expire and be deleted on $expirationDT "
+            $xmlDocument.Save($Meta)
+        }
     }
     else {
         # Target directory was newly deleted since last backup
         Write-Log -Level WARNING "'$TargetDirectory' was deleted. The backup will be deleted after $value $unit"
         $xmlDocument.Meta.SetAttribute("TargetDeleted", "True")
         $xmlDocument.Meta.SetAttribute("TimeDeleted", (Get-Date).ToString())
+        $xmlDocument.Save($Meta)
     }
-    $xmlDocument.Save($Meta)
     Wait-Logging
 }
 

@@ -41,6 +41,8 @@ $META_DIR = ".\meta\"
 # Config settings
 [xml]$config = Get-Content ".\config.xml"
 
+#TODO: Change log file management to use the module's implmentation
+
 Add-LoggingTarget -Name Console
 Set-LoggingDefaultLevel -Level $config.Config.Logging.Level
 if ($LogToFile) {
